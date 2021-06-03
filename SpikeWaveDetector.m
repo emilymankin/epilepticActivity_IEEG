@@ -3,7 +3,7 @@ classdef SpikeWaveDetector < handle
     properties
         
         %general constants
-        samplingRate = 1000;
+        samplingRate = 2000;
         minDistSpikes = 200; % minimal distance for 'different' spikes - in miliseconds
         
         %plotting constants
