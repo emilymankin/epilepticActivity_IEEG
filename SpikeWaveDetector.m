@@ -366,15 +366,18 @@ classdef SpikeWaveDetector < handle
             %of detected peaks and D is the number of conditions checked in
             %the code (a detection will occur if the disjunction of the
             %conditions is true). At index i,j - the array is true if the
-            %peak at index i in peakTimes passed condition j. The order of
-            %conditions: 1. Envelope of the signal after bandpass is above
-            %a set threshold, 2. Amplitude of the signal is above a set
-            %threshold, 3. Gradient (between consecutive time points) of
-            %the signal is above a set threshold, 4. The amplitude & the
-            %gradient are both above a set threshold which is smaller than
-            %the thresholds used in conditions 2 & 3. 5. The amplitude and
-            %the signal after bandpass are both above a threshold smaller
-            %than 1 & 2
+            %peak at index i in peakTimes passed condition j. 
+            %The order of conditions: 
+            %
+            %1. Envelope of the signal after bandpass is above a set threshold, 
+            %2. Amplitude of the signal is above a set threshold, 
+            %3. Gradient (difference between consecutive time points) of
+            %the signal is above a set threshold, 
+            %4. The amplitude & the gradient are both above a set threshold, 
+            %which is smaller than the thresholds used in conditions 2 & 3. 
+            %5. The amplitude and the signal after bandpass are both above 
+            %a threshold smaller than 1 & 2
+            % 
             %indsPerPeak - a cell the length of the number of peaks, each
             %element contains all the indices of that peak
             %zscoresPerPeaksEnv - a cell the length of the number of peaks, each
@@ -894,7 +897,7 @@ classdef SpikeWaveDetector < handle
                 if plotZScores
                     subplot(4,blockSizeToPlot,indBlock);
                 else
-                    subplot(1,blockSizeToPlot,indBlock);
+                    subplot(blockSizeToPlot,1,indBlock);
                 end
                 
                 %plot the block in which the peak was detected
@@ -934,8 +937,10 @@ classdef SpikeWaveDetector < handle
                 end
                 
                 if plotConditionsData
-                    title(['spike #', num2str(iPeak),' passed conditions ',num2str(peakStats.passedConditions(iPeak,:)),' max zscores: HP(red) = ', num2str(peakStats.zscoresPerPeaksMax(iPeak,1)), ' Amp(blue) = ', ...
-                        num2str(peakStats.zscoresPerPeaksMax(iPeak,3)), ' Grad(green) = ', num2str(peakStats.zscoresPerPeaksMax(iPeak,2))]);
+                    title({['spike #', num2str(iPeak),' passed conditions ',num2str(peakStats.passedConditions(iPeak,:))],...
+                        [' max zscores: HP(red) = ', num2str(peakStats.zscoresPerPeaksMax(iPeak,1))],...
+                        [' Amp(blue) = ', num2str(peakStats.zscoresPerPeaksMax(iPeak,3))],...
+                        [' Grad(green) = ', num2str(peakStats.zscoresPerPeaksMax(iPeak,2))]});
                 end
                 hold off;
 
