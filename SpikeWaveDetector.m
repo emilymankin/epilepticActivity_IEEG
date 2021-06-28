@@ -115,6 +115,8 @@ classdef SpikeWaveDetector < handle
                 zscoresPerPeaksAmp = {};
                 zscoresPerPeaksGrad = {};
                 indsPerPeak = {};
+                indsPerPeakOverall = {};
+
             end
             %replace nans by zeros
             originalData = data;
@@ -215,6 +217,7 @@ classdef SpikeWaveDetector < handle
                         currPassedConditions = [];
                         currZscoresPerPeaksMax = [];
                         currIndsPerPeak = cell(1,nCurrPeaks);
+                        currOverallIndsPerPeak = cell(1,nCurrPeaks);
                         currZscoresPerPeaksEnv = cell(1,nCurrPeaks);
                         currZscoresPerPeaksAmp = cell(1,nCurrPeaks);
                         currZscoresPerPeaksGrad = cell(1,nCurrPeaks);
@@ -232,6 +235,7 @@ classdef SpikeWaveDetector < handle
                             end
                             currZscoresPerPeaksMax = [currZscoresPerPeaksMax; max(zsEnv(allPeakInds{iPeak})) max(zsGrad(allPeakInds{iPeak})) max(zsAmp(allPeakInds{iPeak}))];
                             currIndsPerPeak{iPeak} = allPeakInds{iPeak};
+                            currOverallIndsPerPeak{iPeak} = allPeakInds{iPeak} + (iBlock-1)*pointsInBlock;
                             currZscoresPerPeaksEnv{iPeak} = zsEnv(allPeakInds{iPeak});
                             currZscoresPerPeaksAmp{iPeak} = zsAmp(allPeakInds{iPeak});
                             currZscoresPerPeaksGrad{iPeak} = zsGrad(allPeakInds{iPeak});
@@ -271,8 +275,8 @@ classdef SpikeWaveDetector < handle
                     if returnPeakStats
                         passedConditions = [passedConditions; currPassedConditions(~isnanAtPeak,:)];
                         zscoresPerPeaksMax = [zscoresPerPeaksMax; currZscoresPerPeaksMax(~isnanAtPeak,:)];
-                        
                         indsPerPeak = [indsPerPeak currIndsPerPeak(~isnanAtPeak)];
+                        indsPerPeakOverall = [indsPerPeakOverall currOverallIndsPerPeak(~isnanAtPeak)];
                         zscoresPerPeaksEnv = [zscoresPerPeaksEnv currZscoresPerPeaksEnv(~isnanAtPeak)];
                         zscoresPerPeaksAmp = [zscoresPerPeaksAmp currZscoresPerPeaksAmp(~isnanAtPeak)];
                         zscoresPerPeaksGrad = [zscoresPerPeaksGrad currZscoresPerPeaksGrad(~isnanAtPeak)];
@@ -291,6 +295,7 @@ classdef SpikeWaveDetector < handle
                 peakStats.zscoresPerPeaksAmp = zscoresPerPeaksAmp;
                 peakStats.zscoresPerPeaksGrad = zscoresPerPeaksGrad;
                 peakStats.indsPerPeak = indsPerPeak;
+                peakStats.indsPerPeakOverall = indsPerPeakOverall;
                 peakStats.passedConditions = passedConditions;
             end
             
