@@ -135,7 +135,7 @@ classdef SpikeWaveDetector < handle
                 
                 % amplitude
                 if obj.useAmp || obj.useConjAmpGrad || obj.useConjAmpEnv
-                    zsAmp = zscore(currBlock);
+                    zsAmp = abs(zscore(currBlock));
                     pointsPassedThreshAmplitude = zsAmp > obj.SDthresholdAmp;
                     pointsPassedThreshAmplitudeLowThresh = zsAmp > obj.SDthresholdConjAmp;
                 else
@@ -149,7 +149,7 @@ classdef SpikeWaveDetector < handle
                 % gradient
                 if obj.useGrad || obj.useConjAmpGrad
                     dataGradient = [0 diff(currBlock)];
-                    zsGrad = zscore(dataGradient);
+                    zsGrad = abs(zscore(dataGradient));
                     pointsPassedThreshGradient = zsGrad > obj.SDthresholdGrad;
                     pointsPassedThreshGradientLowThresh = zsGrad > obj.SDthresholdConjGrad;
                 else
@@ -197,8 +197,13 @@ classdef SpikeWaveDetector < handle
                 if obj.isDisjunction
                     %if isDisjuction is true - points are detected as threshold if any of the conditions
                     %is met
-                    pointsPassedThresh = pointsPassedThreshEnv | pointsPassedThreshGradient | pointsPassedThreshAmplitude | ...
-                        pointsPassedThreshAmpGradLowThresh | pointsPassedThreshAmpEnvLowThresh;
+                    % if isDisjunction is a number, points are detected if
+                    % that number of conditions is met.
+
+                    pointsPassedThresh = sum([pointsPassedThreshEnv; pointsPassedThreshGradient;...
+                        pointsPassedThreshAmplitude;pointsPassedThreshAmpGradLowThresh;...
+                        pointsPassedThreshAmpEnvLowThresh]) >= double(obj.isDisjunction);
+                    1;
                 else
                     %if isDisjuction is false - points are detected as threshold if all of the conditions
                     %are met
