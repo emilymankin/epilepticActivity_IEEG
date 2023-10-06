@@ -66,7 +66,8 @@ classdef SpikeWaveDetector < handle
         threshMah = 200;
         nanThresh = 0.5;
         
-        
+        makeDebugFigs = 0;
+        pauseForDebugFigs = 1;
     end
     
     methods
@@ -103,8 +104,17 @@ classdef SpikeWaveDetector < handle
             %each peak stores the maximal zscores of HP (index 1),
             %amplitude (index 2), and gradient (index 3) for that peak.
             
+            if obj.makeDebugFigs
+                figure;
+                ax(1) = subplot(511); title('amp'); hold on; plot(obj.SDthresholdAmp*[1 1],[0 1400],'k','linewidth',2);plot(-obj.SDthresholdAmp*[1 1],[0 1400],'k','linewidth',2);
+                ax(2) = subplot(512); title('grad'); hold on; plot(obj.SDthresholdGrad*[1 1],[0 1400],'k','linewidth',2);plot(-obj.SDthresholdGrad*[1 1],[0 1400],'k','linewidth',2);
+                ax(3) = subplot(513); title('env'); hold on; plot(obj.SDthresholdEnv*[1 1],[0 1400],'k','linewidth',2);plot(-obj.SDthresholdEnv*[1 1],[0 1400],'k','linewidth',2);
+                ax(4) = subplot(514); title('corr with spindle and ripple'); hold on;
+                ax(5) = subplot(515);
+            end
+            
             if nargin < 3
-                returnPeakStats = false;
+                returnPeakStats = true;
             end
             
             peakTimes = [];
@@ -116,6 +126,8 @@ classdef SpikeWaveDetector < handle
                 zscoresPerPeaksGrad = {};
                 indsPerPeak = {};
                 indsPerPeakOverall = {};
+                spindleIEDCorrPerPeak = [];
+                rippleIEDCorrPerPeak = [];
 
             end
             %replace nans by zeros
@@ -125,6 +137,8 @@ classdef SpikeWaveDetector < handle
             pointsInBlock = obj.blockSizeSec*obj.samplingRate;
             nBlocks = floor(length(data)/pointsInBlock);
             ind = 1;
+            
+            colors = jet(nBlocks);
             for iBlock = 1:nBlocks
                 %use 3 conditions: absolute amplitude above a threshold,
                 %gradient above threshold, and envelope of the signal after
@@ -132,6 +146,8 @@ classdef SpikeWaveDetector < handle
                 
                 currBlock = data((iBlock-1)*pointsInBlock+1:iBlock*pointsInBlock);
                 nCurrBlock = length(currBlock);
+                getContextSpin = @(x)max(1,x-round(obj.samplingRate/4)):min(x+round(obj.samplingRate/4),nCurrBlock);
+                getContextRip = @(x)max(1,x-round(obj.samplingRate/20)):min(x+round(obj.samplingRate/4),nCurrBlock);
                 
                 % amplitude
                 if obj.useAmp || obj.useConjAmpGrad || obj.useConjAmpEnv
@@ -215,9 +231,33 @@ classdef SpikeWaveDetector < handle
                 %(in paper - 5 ms, due to adapatations of code - 1 ms, i.e. no minimal length), and separates between
                 %different spikes (merges points which are close
                 %together to one spike)
+                if obj.makeDebugFigs
+                    h = histogram(ax(1),zscore(currBlock)); h.FaceAlpha = 0.1; h.EdgeColor = colors(iBlock,:);
+                    h = histogram(ax(2),zscore(dataGradient)); h.FaceAlpha = 0.1; h.EdgeColor = colors(iBlock,:);
+                    h = histogram(ax(3),zscore(envBlock)); h.FaceAlpha = 0.1; h.EdgeColor = colors(iBlock,:);
+                    cla(ax(5)); hold on; plot(ax(5),1:nCurrBlock,currBlock);
+                    
+%                     
+%                     h = histogram(ax(4),ccSpin); h.FaceAlpha = 0.1; h.EdgeColor = colors(iBlock,:);
+%                     h = histogram(ax(4),ccRip); h.FaceAlpha = 0.1; h.EdgeColor = colors(iBlock,:);
+%                     
+                    if sum(pointsPassedThresh)>0
+                        ppt = currBlock;
+                        ppt(~pointsPassedThresh) = NaN;
+                        plot(ax(5),1:nCurrBlock,ppt,'r','linewidth',2)
+%                         plot(ax(4),ccSpin(pointsPassedThresh),rand(1,sum(pointsPassedThresh)),'*')
+                    end
+                    if obj.pauseForDebugFigs
+                        pause;
+                    end
+                end
+                
                 if sum(pointsPassedThresh)>0
                     if returnPeakStats
                         [currPeaks,allPeakInds] = obj.findSequences(currBlock, pointsPassedThresh);
+                        spindles = obj.bandpass(currBlock, obj.samplingRate, 11, 16);
+                        ripples = obj.bandpass(currBlock, obj.samplingRate, 75, 120);
+
                         nCurrPeaks = length(currPeaks);
                         currPassedConditions = [];
                         currZscoresPerPeaksMax = [];
@@ -226,6 +266,8 @@ classdef SpikeWaveDetector < handle
                         currZscoresPerPeaksEnv = cell(1,nCurrPeaks);
                         currZscoresPerPeaksAmp = cell(1,nCurrPeaks);
                         currZscoresPerPeaksGrad = cell(1,nCurrPeaks);
+                        currSpindleIEDcorr = zeros(1,nCurrPeaks);
+                        currRippleIEDcorr = zeros(1,nCurrPeaks);
                         for iPeak = 1:nCurrPeaks
 
                             if obj.conditionsArrayTrueIfAny
@@ -244,6 +286,20 @@ classdef SpikeWaveDetector < handle
                             currZscoresPerPeaksEnv{iPeak} = zsEnv(allPeakInds{iPeak});
                             currZscoresPerPeaksAmp{iPeak} = zsAmp(allPeakInds{iPeak});
                             currZscoresPerPeaksGrad{iPeak} = zsGrad(allPeakInds{iPeak});
+                            inds = getContextSpin(currPeaks(iPeak));
+                            currSpindleIEDcorr(iPeak) = corr(currBlock(inds)',spindles(inds)');
+                            inds = getContextRip(currPeaks(iPeak));
+                            currRippleIEDcorr(iPeak) = corr(currBlock(inds)',ripples(inds)');
+                            if obj.makeDebugFigs
+                                plot(ax(5),spindles);
+                                plot(ax(5),ripples);
+                                if exist('lastPlot','var')
+                                    set(lastPlot,'markerFaceColor','none');
+                                end
+                                lastPlot(1) = plot(ax(4),currSpindleIEDcorr(iPeak),.2,'o','color',colors(iBlock,:),'markerFaceColor',colors(iBlock,:));
+                                lastPlot(2) = plot(ax(4),currRippleIEDcorr(iPeak),.4,'o','color',colors(iBlock,:),'markerFaceColor',colors(iBlock,:));
+                                
+                            end
                         end
                     else
                         currPeaks = obj.findSequences(currBlock, pointsPassedThresh);
@@ -285,7 +341,8 @@ classdef SpikeWaveDetector < handle
                         zscoresPerPeaksEnv = [zscoresPerPeaksEnv currZscoresPerPeaksEnv(~isnanAtPeak)];
                         zscoresPerPeaksAmp = [zscoresPerPeaksAmp currZscoresPerPeaksAmp(~isnanAtPeak)];
                         zscoresPerPeaksGrad = [zscoresPerPeaksGrad currZscoresPerPeaksGrad(~isnanAtPeak)];
-                        
+                        spindleIEDCorrPerPeak = [spindleIEDCorrPerPeak currSpindleIEDcorr(~isnanAtPeak)];
+                        rippleIEDCorrPerPeak = [rippleIEDCorrPerPeak currRippleIEDcorr(~isnanAtPeak)];
                     end
                 else
                     currPeaks = [];
@@ -302,6 +359,8 @@ classdef SpikeWaveDetector < handle
                 peakStats.indsPerPeak = indsPerPeak;
                 peakStats.indsPerPeakOverall = indsPerPeakOverall;
                 peakStats.passedConditions = passedConditions;
+                peakStats.spindleIEDCorr = spindleIEDCorrPerPeak;
+                peakStats.rippleIEDCorr = rippleIEDCorrPerPeak;
             end
             
         end
